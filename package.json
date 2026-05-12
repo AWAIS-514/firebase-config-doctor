@@ -1,0 +1,10 @@
+{
+  "name": "firebase-config-doctor",
+  "version": "1.0.0",
+  "description": "CLI tool that diagnoses Firebase config issues in React Native projects",
+  "main": "firebase-config-doctor.js",
+  "scripts": {
+    "firebase-config-doctor": "node firebase-config-doctor.js"
+  },
+  "license": "MIT"
+}

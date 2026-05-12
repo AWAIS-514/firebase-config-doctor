@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDisplayName</key>
+  <string>DummyRnApp</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.dummyrnapp</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+
+  <!-- URL schemes — the REVERSED_CLIENT_ID must be registered here for Firebase OAuth -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>com.googleusercontent.apps.123456789-abcdefghijklmnop</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>
