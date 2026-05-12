@@ -1,155 +1,65 @@
-// packageCheck.test.js
-// Simple unit tests for the package.json Firebase check.
-//
-// Run with: node tests/packageCheck.test.js
-
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
 const { runPackageCheck } = require('../checks/packageCheck');
 
-// -------------------------------------------------------------------
-// Test helpers
-// -------------------------------------------------------------------
-
-function createTempProject() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rn-pkg-test-'));
+function setup() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'rn-pkg-'));
 }
 
-function removeTempProject(dir) {
+function teardown(dir) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-let passed = 0;
-let failed = 0;
-
-function assert(condition, testName) {
-  if (condition) {
-    console.log(`  PASS: ${testName}`);
-    passed++;
-  } else {
-    console.log(`  FAIL: ${testName}`);
-    failed++;
-  }
-}
-
-function silenceLogs(fn) {
-  const original = console.log;
+function run(dir) {
+  const orig = console.log;
   console.log = () => {};
-  const result = fn();
-  console.log = original;
+  const result = runPackageCheck(dir);
+  console.log = orig;
   return result;
 }
 
-// -------------------------------------------------------------------
-// Test 1: Missing package.json → should return a suggestion
-// -------------------------------------------------------------------
-function testMissingPackageJson() {
-  console.log('\nTest: Missing package.json');
-
-  const tmpDir = createTempProject();
-
-  // No package.json created
-
-  const suggestions = silenceLogs(() => runPackageCheck(tmpDir));
-
-  assert(
-    suggestions.length > 0,
-    'Returns at least one suggestion when package.json is missing'
-  );
-
-  removeTempProject(tmpDir);
+function writePackageJson(dir, deps = {}) {
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'app', dependencies: deps }));
 }
 
-// -------------------------------------------------------------------
-// Test 2: Malformed package.json → should return a suggestion
-// -------------------------------------------------------------------
-function testMalformedPackageJson() {
-  console.log('\nTest: Malformed package.json');
-
-  const tmpDir = createTempProject();
-
-  // Write invalid JSON
-  fs.writeFileSync(path.join(tmpDir, 'package.json'), '{ this is not json }');
-
-  const suggestions = silenceLogs(() => runPackageCheck(tmpDir));
-
-  assert(
-    suggestions.length > 0,
-    'Returns a suggestion when package.json cannot be parsed'
-  );
-
-  removeTempProject(tmpDir);
+let passed = 0, failed = 0;
+function assert(condition, name) {
+  if (condition) { console.log(`  PASS: ${name}`); passed++; }
+  else           { console.log(`  FAIL: ${name}`); failed++; }
 }
 
-// -------------------------------------------------------------------
-// Test 3: Firebase package missing → should return install suggestion
-// -------------------------------------------------------------------
-function testFirebasePackageMissing() {
-  console.log('\nTest: Firebase package not in package.json');
+// Firebase present → no suggestions
+const t1 = setup();
+writePackageJson(t1, { '@react-native-firebase/app': '^18.0.0' });
+assert(run(t1).length === 0, 'Firebase installed → no suggestions');
+teardown(t1);
 
-  const tmpDir = createTempProject();
+// Firebase missing
+const t2 = setup();
+writePackageJson(t2, { react: '18.0.0', 'react-native': '0.72.0' });
+assert(run(t2).some(s => s.includes('@react-native-firebase/app')), 'Firebase missing → install suggestion');
+teardown(t2);
 
-  // Valid package.json but no Firebase dependency
-  const packageJson = {
-    name: 'my-app',
-    version: '1.0.0',
-    dependencies: {
-      react: '18.0.0',
-      'react-native': '0.72.0',
-    },
-  };
-  fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+// No package.json
+const t3 = setup();
+assert(run(t3).length > 0, 'no package.json → suggestion');
+teardown(t3);
 
-  const suggestions = silenceLogs(() => runPackageCheck(tmpDir));
+// Malformed package.json
+const t4 = setup();
+fs.writeFileSync(path.join(t4, 'package.json'), '{ bad json }');
+assert(run(t4).length > 0, 'malformed package.json → suggestion');
+teardown(t4);
 
-  assert(
-    suggestions.some(s => s.includes('@react-native-firebase/app')),
-    'Suggestion mentions @react-native-firebase/app'
-  );
-
-  removeTempProject(tmpDir);
-}
-
-// -------------------------------------------------------------------
-// Test 4: Firebase package present → should return no suggestions
-// -------------------------------------------------------------------
-function testFirebasePackagePresent() {
-  console.log('\nTest: Firebase package is correctly installed');
-
-  const tmpDir = createTempProject();
-
-  const packageJson = {
-    name: 'my-app',
-    version: '1.0.0',
-    dependencies: {
-      react: '18.0.0',
-      'react-native': '0.72.0',
-      '@react-native-firebase/app': '^18.0.0',
-    },
-  };
-  fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
-
-  const suggestions = silenceLogs(() => runPackageCheck(tmpDir));
-
-  assert(suggestions.length === 0, 'No suggestions when Firebase is installed');
-
-  removeTempProject(tmpDir);
-}
-
-// -------------------------------------------------------------------
-// Run all tests
-// -------------------------------------------------------------------
-console.log('Running package check tests...');
-
-testMissingPackageJson();
-testMalformedPackageJson();
-testFirebasePackageMissing();
-testFirebasePackagePresent();
+// Firebase in devDependencies (still valid)
+const t5 = setup();
+fs.writeFileSync(path.join(t5, 'package.json'), JSON.stringify({
+  name: 'app',
+  devDependencies: { '@react-native-firebase/app': '^18.0.0' },
+}));
+assert(run(t5).length === 0, 'Firebase in devDependencies → no suggestions');
+teardown(t5);
 
 console.log(`\nResults: ${passed} passed, ${failed} failed`);
-
-if (failed > 0) {
-  process.exit(1);
-}
+if (failed > 0) process.exit(1);
